@@ -1,0 +1,142 @@
+---
+title: "TIdyTuesdayAvatar"
+author: "Jeff Grayum"
+date: "11/16/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+#install.packages("tvthemes")
+library(tvthemes)
+#install.packages("tidytext")
+library(tidytext)
+theme_set(theme_brooklyn99())
+```
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2020-08-11')
+
+avatar <- tuesdata$avatar
+
+scenes <- tuesdata$scene_description
+```
+
+```{r}
+avatar %>%
+  view()
+
+avatar %>%
+  count(book, director, sort = TRUE) %>%
+  ggplot(aes(book, n, fill = director)) + 
+  geom_col() +
+  labs(x = "Book title",
+       y = "Number of lines",
+       fill = "Directors",
+       title = "The length of each book in Avatar: The Last Airbender",
+       subtitle = "Measured by number of lines of text")
+
+avatar %>%
+  filter(character != "Scene Description") %>%
+  mutate(character = fct_lump_n(character, 4)) %>%
+  count(director, character, sort = TRUE) %>%
+  filter(character != "Other") %>%
+  mutate(director = fct_reorder(director, n)) %>%
+  ggplot(aes(n, director, fill = character)) +
+  geom_col() +
+  labs(x = "Number of lines directed",
+       y = "",
+       fill = "Character",
+       title =  "Which directors shaped the characters in Avatar: The Last Airbender?")
+
+avatar %>%
+  count(director, sort = TRUE) %>%
+  mutate(director = fct_reorder(director, n)) %>%
+  ggplot(aes(n, director)) +
+  geom_col() +
+  labs(x = "Number of lines",
+       y = "",
+       fill = "Book",
+       title = "Who directed the Avatar: The Last Airbender series?")
+
+avatar %>%
+  count(character, sort = TRUE) %>%
+  filter(character != "Scene Description") %>%
+  head(10) %>% 
+  mutate(character = fct_reorder(character, n)) %>%
+  ggplot(aes(n, character)) +
+  geom_col() +
+  labs(x = "Number of lines",
+       y = "",
+       title = "Who couldnt shut the fuck up during Avatar: The Last Airbender?")
+
+
+avatar %>%
+  count(character_words, sort = TRUE) %>%
+  filter(!is.na(character_words)) %>%
+  head(50) %>%
+  mutate(character_words = fct_reorder(character_words, n)) %>%
+  ggplot(aes(n, character_words)) +
+  geom_col() +
+  labs(x = "Number of times lines spoken",
+       y = "Phrase",
+       title = "Most common shit people say on Avatar: The Last Airbender")
+
+
+```
+
+```{r}
+scenes %>%
+  view()
+```
+
+
+Now, for Julia's take.
+```{r}
+avatar %>%
+  distinct(book, chapter_num) %>%
+  view()
+
+#Can we predict who is saying what?
+
+avatar %>%
+  count(character, sort = TRUE)
+```
+
+```{r}
+#THIS MODEL WILL ID IF A LINE IS SPOKEN BY AANG, OR A DIFFERENT CHARACTER.
+
+avatar %>%
+  filter(!is.na(character_words)) %>%
+  mutate(book = fct_inorder(book),
+         character = fct_lump_n(character, 10)) %>%
+  count(book, character) %>%
+  mutate(character = reorder_within(character, n, book)) %>%
+  ggplot(aes(n, character, fill = book)) +
+  geom_col() +
+  facet_wrap(~ book, scales = "free") +
+  scale_y_reordered() +
+  scale_fill_manual(values = c(avatar_pal("WaterTribe")(1),
+                               avatar_pal("EarthKingdom")(1),
+                               avatar_pal("FireNation")(1))) +
+  labs(x = "Number of lines",
+       y = NULL,
+       fill = "Book")
+
+  
+```
+
+```{r}
+new_avatar <- avatar %>%
+  filter(!is.na(character_words)) %>%
+  mutate(aang = if_else(character == "Aang", "Aang", "Other")) %>%
+  select(aang, book, text = character_words) %>%
+  view()
+
+new_avatar %>%
+  filter(aang == "Aang") %>%
+  sample_n(10) %>%
+  pull(text)
